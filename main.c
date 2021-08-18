@@ -46,6 +46,7 @@ int main() {
 
                     token = strtok(NULL, " \t\n");
                 }
+                execvp(child_argv[0], child_argv);
                 return 0;
             } else if (pid > 0) {
                 printf("Wait child %d...\n", pid);
