@@ -56,6 +56,9 @@ int main() {
                 printf("FORK FAILED\n");
             }
         }
+        free(line);
+        line = NULL;
+        len = 0;
         printf("> ");
     }
     printf("\n");
