@@ -77,7 +77,8 @@ int main()
 
             pid = fork();
             if (pid == 0) {
-                if (!strncmp(child_argv[child_argc - 1], "&", 1)) {
+                if ((strlen(child_argv[child_argc - 1]) == 1)
+                    && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
                     free(child_argv[child_argc - 1]);
                     child_argv[child_argc - 1] = NULL;
                 }
@@ -89,7 +90,8 @@ int main()
                 free(child_argv);
                 return 0;
             } else if (pid > 0) {
-                if (!strncmp(child_argv[child_argc - 1], "&", 1)) {
+                if ((strlen(child_argv[child_argc - 1]) == 1)
+                    && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
                     ret = waitpid(pid, &wstatus, WNOHANG);
                     if (ret == 0) {
                         // pid status no change
