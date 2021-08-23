@@ -49,6 +49,9 @@ int main()
 
         if (!strncmp(line, "exit", 4)) {
             break;
+        } else if (!token) {
+            printf("> ");
+            continue;
         } else if (!strncmp(token, "echo", 4)) {
             while ((token = strtok(NULL, "\n")) != NULL) {
                 printf("%s", token);
