@@ -73,6 +73,7 @@ int main()
 
                 token = strtok(NULL, " \t\n");
             }
+            child_argv[child_argc] = NULL;
 
             pid = fork();
             if (pid == 0) {
