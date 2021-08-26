@@ -22,6 +22,55 @@ void do_wait_child_proc(pid_t *wait_list, int *cnt)
     }
 }
 
+void do_child(char **child_argv, int child_argc) {
+    int i;
+    if ((strlen(child_argv[child_argc - 1]) == 1)
+        && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
+        free(child_argv[child_argc - 1]);
+        child_argv[child_argc - 1] = NULL;
+    }
+    execvp(child_argv[0], child_argv);
+    for (i = 0; i < child_argc; i++) {
+        free(child_argv[i]);
+        child_argv[i] = NULL;
+    }
+    free(child_argv);
+}
+
+int do_parent(char **child_argv, int child_argc, pid_t pid,
+               pid_t **wait_list, int *wait_list_cnt, int *wait_list_cap)
+{
+    int wstatus, ret;
+    pid_t *new_wait_list;
+    void *tmp;
+    if ((strlen(child_argv[child_argc - 1]) == 1)
+        && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
+        ret = waitpid(pid, &wstatus, WNOHANG);
+        if (ret == 0) {
+            // pid status no change
+            if (*wait_list_cnt == *wait_list_cap) {
+                // Extend wait_list size
+                new_wait_list = (pid_t *) malloc(sizeof(pid_t) * *wait_list_cap * 2);
+                tmp = *wait_list;
+                memcpy(new_wait_list, *wait_list, sizeof(pid_t) * *wait_list_cap);
+                *wait_list = new_wait_list;
+                free(tmp);
+                *wait_list_cap *= 2;
+            }
+            (*wait_list)[(*wait_list_cnt)++] = pid;
+        } else if (ret < 0) {
+            printf("Wait pid error\n");
+        } else if (WIFEXITED(wstatus)) {
+            printf("[%d] exited\n", ret);
+        } else {
+            printf("[%d] signaled\n", ret);
+        }
+    } else {
+        ret = waitpid(pid, &wstatus, 0);
+    }
+    return ret;
+}
+
 int main()
 {
     char *line = NULL;
@@ -29,11 +78,11 @@ int main()
     char **child_argv = NULL, **new_argv;
     void *tmp;
     size_t len = 0;
-    int wstatus, ret, i;
+    int ret, i;
     int child_argc = 0, argv_cap = 0;
     int wait_list_cap = 0, wait_list_cnt = 0;
     pid_t pid;
-    pid_t *wait_list, *new_wait_list;
+    pid_t *wait_list;
 
     // Initialize argv_cap of child_argv
     argv_cap = 5;
@@ -77,44 +126,11 @@ int main()
 
             pid = fork();
             if (pid == 0) {
-                if ((strlen(child_argv[child_argc - 1]) == 1)
-                    && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
-                    free(child_argv[child_argc - 1]);
-                    child_argv[child_argc - 1] = NULL;
-                }
-                execvp(child_argv[0], child_argv);
-                for (i = 0; i < child_argc; i++) {
-                    free(child_argv[i]);
-                    child_argv[i] = NULL;
-                }
-                free(child_argv);
+                do_child(child_argv, child_argc);
                 return 0;
             } else if (pid > 0) {
-                if ((strlen(child_argv[child_argc - 1]) == 1)
-                    && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
-                    ret = waitpid(pid, &wstatus, WNOHANG);
-                    if (ret == 0) {
-                        // pid status no change
-                        if (wait_list_cnt == wait_list_cap) {
-                            // Extend wait_list size
-                            new_wait_list = (pid_t *) malloc(sizeof(pid_t) * wait_list_cap * 2);
-                            tmp = wait_list;
-                            memcpy(new_wait_list, wait_list, sizeof(pid_t) * wait_list_cap);
-                            wait_list = new_wait_list;
-                            free(tmp);
-                            wait_list_cap *= 2;
-                        }
-                        wait_list[wait_list_cnt++] = pid;
-                    } else if (ret < 0) {
-                        printf("Wait pid error\n");
-                    } else if (WIFEXITED(wstatus)) {
-                        printf("[%d] exited\n", ret);
-                    } else {
-                        printf("[%d] signaled\n", ret);
-                    }
-                } else {
-                    ret = waitpid(pid, &wstatus, 0);
-                }
+                ret = do_parent(child_argv, child_argc, pid, &wait_list,
+                                &wait_list_cnt, &wait_list_cap);
             } else {
                 printf("FORK FAILED\n");
             }
