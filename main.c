@@ -23,13 +23,52 @@ void do_wait_child_proc(pid_t *wait_list, int *cnt)
 }
 
 void do_child(char **child_argv, int child_argc) {
-    int i;
+    int i, arg_st_idx;
+    int pipe_fds[2];
+    int tmp_fd;
+    pid_t pid;
     if ((strlen(child_argv[child_argc - 1]) == 1)
         && (!strncmp(child_argv[child_argc - 1], "&", 1))) {
         free(child_argv[child_argc - 1]);
         child_argv[child_argc - 1] = NULL;
     }
-    execvp(child_argv[0], child_argv);
+    for (i = 0, arg_st_idx = 0; i < child_argc; i++) {
+        if (strlen(child_argv[i]) == 1 && !strcmp(child_argv[i], "|")) {
+            free(child_argv[i]);
+            child_argv[i] = NULL;
+            if (pipe(pipe_fds) != 0) {
+                printf("Pipe error");
+            }
+
+            pid = fork();
+            if (pid == 0) { // child closes read
+                close(pipe_fds[0]);
+                dup2(pipe_fds[1], 1);
+                if (arg_st_idx > 0) {
+                    dup2(tmp_fd, 0);
+                }
+
+                execvp(child_argv[arg_st_idx], &(child_argv[arg_st_idx]));
+                return;
+            } else if (pid > 0) { // parent close read
+                close(pipe_fds[1]);
+                if (arg_st_idx > 0) {
+                    close(tmp_fd);
+                }
+                tmp_fd = pipe_fds[0];
+
+                waitpid(pid, NULL, 0);
+            } else {
+                printf("Fork error when handlign pipe\n");
+            }
+            arg_st_idx = i + 1;
+        }
+    }
+
+    if (arg_st_idx > 0) {
+        dup2(tmp_fd, 0);
+    }
+    execvp(child_argv[arg_st_idx], &(child_argv[arg_st_idx]));
     for (i = 0; i < child_argc; i++) {
         free(child_argv[i]);
         child_argv[i] = NULL;
